@@ -40,6 +40,7 @@ export const Icons = {
   Expense: MinusCircle,
   MinusCircle: MinusCircle,
   AI: Brain,
+  Brain: Brain,
   Target: Target,
   Zap: Zap,
   Dollar: DollarSign,

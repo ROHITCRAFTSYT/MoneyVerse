@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Quest, NewsItem } from '../types';
+import { Quest, NewsItem, LessonContent } from '../types';
 import { Icons } from './Icons';
 import { getExplainedNews, getLearningContent } from '../services/geminiService';
 import { QUEST_TEMPLATES } from '../data/quests';
@@ -12,9 +12,16 @@ interface LearningHubProps {
 
 const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNavigate }) => {
   const [news, setNews] = useState<NewsItem[]>([]);
-  const [activeLesson, setActiveLesson] = useState<string | null>(null);
-  const [lessonContent, setLessonContent] = useState<string>('');
+  
+  // Lesson & Quiz State
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null); // Quest ID
+  const [lessonData, setLessonData] = useState<LessonContent | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
+  const [viewMode, setViewMode] = useState<'READ' | 'QUIZ' | 'RESULT'>('READ');
+  
+  // Quiz State
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([-1, -1, -1]); // -1 means unanswered
+  const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
     const fetchNews = async () => {
@@ -25,27 +32,57 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
   }, []);
 
   const handleStartLesson = async (quest: Quest) => {
-    setActiveLesson(quest.title);
+    setActiveLessonId(quest.id);
     setLoadingLesson(true);
-    const content = await getLearningContent(quest.title);
-    setLessonContent(content);
+    setViewMode('READ');
+    setQuizAnswers([-1, -1, -1]);
+    setQuizScore(0);
+    
+    const data = await getLearningContent(quest.title);
+    setLessonData(data);
     setLoadingLesson(false);
   };
 
   const closeLesson = () => {
-    if (activeLesson) {
-        // Find quest ID
-        const quest = quests.find(q => q.title === activeLesson);
-        if(quest && !quest.completed) onCompleteQuest(quest.id);
-    }
-    setActiveLesson(null);
-    setLessonContent('');
+    setActiveLessonId(null);
+    setLessonData(null);
   }
 
   const handleQuestAction = (quest: Quest) => {
     const template = QUEST_TEMPLATES.find(t => t.id === quest.id);
     if (template?.actionPath) {
       onNavigate(template.actionPath);
+    }
+  };
+
+  const handleAnswerSelect = (questionIndex: number, optionIndex: number) => {
+    const newAnswers = [...quizAnswers];
+    newAnswers[questionIndex] = optionIndex;
+    setQuizAnswers(newAnswers);
+  };
+
+  const handleSubmitQuiz = () => {
+    if (!lessonData) return;
+    
+    let score = 0;
+    lessonData.quiz.forEach((q, idx) => {
+      if (quizAnswers[idx] === q.correctAnswerIndex) {
+        score++;
+      }
+    });
+    setQuizScore(score);
+    setViewMode('RESULT');
+  };
+
+  const handleRetryQuiz = () => {
+    setQuizAnswers([-1, -1, -1]);
+    setViewMode('QUIZ');
+  };
+
+  const handleClaimReward = () => {
+    if (activeLessonId) {
+      onCompleteQuest(activeLessonId);
+      closeLesson();
     }
   };
 
@@ -89,9 +126,9 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
                     {isLearning ? (
                       <button 
                         onClick={() => handleStartLesson(quest)}
-                        className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium py-2 rounded-lg text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium py-2 rounded-lg text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-2 group"
                       >
-                        <Icons.Learn size={16} /> Start Lesson
+                        <Icons.Learn size={16} className="group-hover:scale-110 transition-transform" /> Start Quest
                       </button>
                     ) : (
                       <button 
@@ -142,32 +179,155 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
         </div>
       </div>
 
-       {/* Lesson Modal */}
-       {activeLesson && (
-        <div className="fixed inset-0 bg-white dark:bg-black/95 z-50 flex flex-col p-6 animate-fade-in">
-          <button onClick={() => setActiveLesson(null)} className="self-end text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white mb-4">
-            <Icons.X size={24} />
-          </button>
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-6">{activeLesson}</h2>
-            {loadingLesson ? (
-              <div className="flex flex-col items-center justify-center h-64 text-verse-accent">
-                <Icons.AI className="animate-bounce mb-4" size={48} />
-                <p>Generating lesson...</p>
+       {/* Lesson/Quiz Modal */}
+       {activeLessonId && (
+        <div className="fixed inset-0 bg-white dark:bg-black/95 z-50 flex flex-col animate-fade-in">
+          
+          {/* Modal Header */}
+          <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-800">
+            <h2 className="text-lg font-display font-bold text-slate-900 dark:text-white truncate pr-4">
+              {lessonData?.topic || "Loading..."}
+            </h2>
+            <button onClick={closeLesson} className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+              <Icons.X size={24} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+            
+            {loadingLesson && (
+              <div className="flex flex-col items-center justify-center h-full text-verse-accent space-y-4">
+                <Icons.AI className="animate-bounce" size={48} />
+                <p className="animate-pulse font-medium">Summoning knowledge...</p>
               </div>
-            ) : (
-              <div className="prose prose-lg dark:prose-invert max-w-none">
-                <p className="text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{lessonContent}</p>
+            )}
+
+            {!loadingLesson && lessonData && (
+              <div className="max-w-xl mx-auto">
+                {/* Mode: READING */}
+                {viewMode === 'READ' && (
+                  <div className="space-y-6 animate-slide-up">
+                    <div className="prose prose-lg dark:prose-invert max-w-none">
+                       <p className="text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                         {lessonData.content}
+                       </p>
+                    </div>
+                    
+                    {lessonData.quiz && lessonData.quiz.length > 0 && (
+                      <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
+                        <div className="bg-gradient-to-r from-verse-accent to-purple-600 p-6 rounded-2xl text-white text-center shadow-lg">
+                          <Icons.Brain size={48} className="mx-auto mb-2 text-white/80" />
+                          <h3 className="text-xl font-bold mb-1">Knowledge Check!</h3>
+                          <p className="text-sm text-white/80 mb-4">Prove your skills to earn XP.</p>
+                          <button 
+                            onClick={() => setViewMode('QUIZ')}
+                            className="bg-white text-verse-accent font-bold py-3 px-8 rounded-xl hover:bg-indigo-50 transition-colors shadow-md active:scale-95"
+                          >
+                            Start Challenge
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Mode: QUIZ */}
+                {viewMode === 'QUIZ' && (
+                  <div className="space-y-8 animate-slide-up">
+                    <div className="flex items-center gap-2 mb-6">
+                      <button onClick={() => setViewMode('READ')} className="text-sm text-slate-500 hover:text-verse-accent flex items-center gap-1">
+                        ← Back to Lesson
+                      </button>
+                      <div className="flex-1 text-center font-bold text-slate-900 dark:text-white">Quiz Challenge</div>
+                      <div className="w-16"></div> {/* Spacer */}
+                    </div>
+
+                    {lessonData.quiz.map((q, qIdx) => (
+                      <div key={qIdx} className="space-y-3">
+                        <h4 className="font-bold text-lg text-slate-900 dark:text-white flex gap-3">
+                          <span className="flex-shrink-0 w-8 h-8 bg-verse-accent/10 text-verse-accent rounded-full flex items-center justify-center text-sm">{qIdx + 1}</span>
+                          {q.question}
+                        </h4>
+                        <div className="grid gap-2 pl-11">
+                          {q.options.map((option, oIdx) => (
+                            <button
+                              key={oIdx}
+                              onClick={() => handleAnswerSelect(qIdx, oIdx)}
+                              className={`text-left p-4 rounded-xl border transition-all ${
+                                quizAnswers[qIdx] === oIdx 
+                                  ? 'bg-verse-accent text-white border-verse-accent shadow-md' 
+                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-verse-accent'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <button 
+                      onClick={handleSubmitQuiz}
+                      disabled={quizAnswers.some(a => a === -1)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition-all mt-8"
+                    >
+                      Submit Answers
+                    </button>
+                  </div>
+                )}
+
+                {/* Mode: RESULT */}
+                {viewMode === 'RESULT' && (
+                  <div className="text-center space-y-6 py-10 animate-scale-in">
+                    {quizScore === lessonData.quiz.length ? (
+                      // Success State
+                      <>
+                        <div className="inline-block p-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-full mb-4">
+                          <Icons.Trophy size={64} className="text-emerald-500" />
+                        </div>
+                        <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white">Quest Complete!</h2>
+                        <p className="text-slate-500 dark:text-slate-400">You got {quizScore}/{lessonData.quiz.length} correct. Masterful!</p>
+                        
+                        <div className="bg-verse-card p-6 rounded-2xl border border-verse-accent/30 max-w-sm mx-auto mt-6">
+                           <div className="text-verse-accent text-sm font-bold uppercase tracking-wider mb-2">REWARD</div>
+                           <div className="text-4xl font-display font-bold text-white mb-1">+{quests.find(q => q.id === activeLessonId)?.xpReward} XP</div>
+                        </div>
+
+                        <button 
+                          onClick={handleClaimReward}
+                          className="w-full max-w-xs bg-verse-accent hover:bg-violet-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-verse-accent/30 transition-all mt-8 animate-pulse"
+                        >
+                          Collect Reward
+                        </button>
+                      </>
+                    ) : (
+                      // Failure State
+                      <>
+                        <div className="inline-block p-6 bg-rose-100 dark:bg-rose-900/30 rounded-full mb-4">
+                          <Icons.Alert size={64} className="text-rose-500" />
+                        </div>
+                        <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white">So Close!</h2>
+                        <p className="text-slate-500 dark:text-slate-400">You scored {quizScore}/{lessonData.quiz.length}. You need 100% to pass.</p>
+                        
+                        <button 
+                          onClick={handleRetryQuiz}
+                          className="w-full max-w-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-bold py-4 rounded-xl transition-all mt-8"
+                        >
+                          Try Again
+                        </button>
+                        <button 
+                          onClick={() => setViewMode('READ')}
+                          className="block w-full text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white mt-4"
+                        >
+                          Review Lesson
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
-          <button 
-            onClick={closeLesson}
-            disabled={loadingLesson}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl mt-4 shadow-lg shadow-emerald-900/40 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <Icons.Check /> Complete & Collect XP
-          </button>
         </div>
       )}
     </div>

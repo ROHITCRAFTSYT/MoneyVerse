@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { Transaction, NewsItem } from '../types';
+import { Transaction, NewsItem, LessonContent } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -90,15 +90,47 @@ export const getExplainedNews = async (): Promise<NewsItem[]> => {
   }
 };
 
-export const getLearningContent = async (topic: string): Promise<string> => {
+export const getLearningContent = async (topic: string): Promise<LessonContent | null> => {
   try {
-    const prompt = `Explain "${topic}" to a teenager in under 150 words. Use analogies (gaming, food, sports). make it fun.`;
+    const prompt = `
+      You are a fun financial mentor for teens. 
+      Create a short lesson about "${topic}".
+      The lesson should be engaging, use analogies (gaming, food, sports), and be under 200 words.
+      
+      Crucially, generate a quiz with 3 multiple-choice questions to test their understanding of this specific lesson.
+      
+      Return the response as a strictly valid JSON object with the following schema:
+      {
+        "topic": "The exact topic title",
+        "content": "The markdown lesson text (use bolding and emojis)",
+        "quiz": [
+          {
+            "question": "Question text",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswerIndex": 0 // Integer 0-3
+          }
+        ]
+      }
+    `;
+
     const response = await ai.models.generateContent({
       model: MODEL_ID,
       contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
     });
-    return response.text || "Content loading failed. Try again later!";
+
+    const text = response.text;
+    if (!text) return null;
+    
+    return JSON.parse(text) as LessonContent;
   } catch (e) {
-    return "Could not load lesson. Check connection.";
+    console.error("Lesson generation error:", e);
+    return {
+      topic: topic,
+      content: "Could not load lesson content. Please check your internet connection and try again.",
+      quiz: []
+    };
   }
 }

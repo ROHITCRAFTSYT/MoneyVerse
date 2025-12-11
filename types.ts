@@ -120,3 +120,16 @@ export interface Order {
   targetPrice: number;
   quantity: number;
 }
+
+// Gamification Types
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswerIndex: number;
+}
+
+export interface LessonContent {
+  topic: string;
+  content: string; // Markdown
+  quiz: QuizQuestion[];
+}
