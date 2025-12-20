@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Icons } from './components/Icons';
 import Dashboard from './components/Dashboard';
@@ -261,6 +262,13 @@ const App: React.FC = () => {
     if (newTxList.length >= 50) unlockBadge('7');
   };
 
+  const handleEditTransaction = async (updatedT: Transaction) => {
+    // Optimistic Update
+    setTransactions(prev => prev.map(t => t.id === updatedT.id ? updatedT : t));
+    // DB Save
+    await db.transactions.update(updatedT);
+  };
+
   const handleDeleteTransaction = async (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
     await db.transactions.delete(id);
@@ -472,6 +480,7 @@ const App: React.FC = () => {
             transactions={transactions} 
             categories={[...DEFAULT_CATEGORIES, ...(user.customCategories || [])]}
             onAddTransaction={handleAddTransaction}
+            onEditTransaction={handleEditTransaction}
             onDeleteTransaction={handleDeleteTransaction}
             onAddCategory={handleAddCategory}
             currencySymbol={CURRENCY_SYMBOLS[user.currency] || '$'}

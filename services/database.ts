@@ -53,6 +53,14 @@ export const db = {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updated));
       return updated;
     },
+    update: async (transaction: Transaction): Promise<Transaction[]> => {
+      await delay(200);
+      const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+      const current: Transaction[] = data ? JSON.parse(data) : [];
+      const updated = current.map(t => t.id === transaction.id ? transaction : t);
+      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updated));
+      return updated;
+    },
     delete: async (id: string): Promise<Transaction[]> => {
       await delay(200);
       const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
