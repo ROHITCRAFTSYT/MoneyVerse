@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { UserProfile, Transaction, TransactionType, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
@@ -16,6 +14,7 @@ const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#3b82f6', '#ec4899', '#64748b'
 const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
   const [aiInsight, setAiInsight] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState(false);
+  const [isNewInsight, setIsNewInsight] = useState(false);
 
   // Calculate totals
   const totalIncome = transactions
@@ -44,9 +43,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
 
   const fetchAdvice = async () => {
     setLoadingAi(true);
+    setIsNewInsight(false);
     const advice = await getFinancialAdvice(transactions);
     setAiInsight(advice);
     setLoadingAi(false);
+    setIsNewInsight(true);
+    
+    // Clear the "new" indicator after 10 seconds
+    setTimeout(() => {
+      setIsNewInsight(false);
+    }, 10000);
   };
 
   return (
@@ -83,23 +89,43 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
       </div>
 
       {/* AI Insights Card */}
-      <div className="bg-gradient-to-r from-indigo-800 to-slate-900 dark:from-indigo-900 dark:to-slate-900 p-5 rounded-2xl border border-indigo-500/30 shadow-lg text-white">
+      <div className={`bg-gradient-to-r from-indigo-800 to-slate-900 dark:from-indigo-900 dark:to-slate-900 p-5 rounded-2xl border border-indigo-500/30 shadow-lg text-white transition-all duration-500 ${isNewInsight ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}`}>
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-display font-bold text-indigo-100 flex items-center gap-2">
-            <Icons.AI className="text-indigo-300" />
-            Gemini Insights
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-display font-bold text-indigo-100 flex items-center gap-2">
+              <Icons.AI className={`text-indigo-300 ${loadingAi ? 'animate-spin' : isNewInsight ? 'animate-bounce' : ''}`} />
+              Gemini Insights
+            </h3>
+            {isNewInsight && (
+              <span className="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse shadow-sm">
+                NEW
+              </span>
+            )}
+          </div>
           <button 
             onClick={fetchAdvice}
             disabled={loadingAi}
-            className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-full transition-colors disabled:opacity-50"
+            className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2 group"
           >
+            <Icons.Refresh size={12} className={`${loadingAi ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
             {loadingAi ? "Thinking..." : "Refresh"}
           </button>
         </div>
-        <div className="text-sm text-indigo-50 leading-relaxed bg-black/20 p-3 rounded-lg min-h-[80px]">
+        <div className={`relative text-sm text-indigo-50 leading-relaxed bg-black/20 p-4 rounded-lg min-h-[80px] transition-all overflow-hidden ${isNewInsight ? 'animate-pulse-glow border border-indigo-500/30' : ''}`}>
+          {loadingAi && (
+            <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
+              </div>
+            </div>
+          )}
+          
           {aiInsight ? (
-            <div className="whitespace-pre-line">{aiInsight}</div>
+            <div className={`whitespace-pre-line ${isNewInsight ? 'animate-fade-in' : ''}`}>
+              {aiInsight}
+            </div>
           ) : (
             <p className="italic opacity-70">Tap Refresh to analyze your spending habits...</p>
           )}
