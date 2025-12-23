@@ -6,20 +6,26 @@ import { Icons } from './Icons';
 interface BudgetTrackerProps {
   transactions: Transaction[];
   categories: string[];
+  customCategories: string[];
   onAddTransaction: (t: Omit<Transaction, 'id' | 'date'>) => void;
   onEditTransaction: (t: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   onAddCategory: (category: string) => void;
+  onEditCategory: (oldName: string, newName: string) => void;
+  onDeleteCategory: (name: string) => void;
   currencySymbol: string;
 }
 
 const BudgetTracker: React.FC<BudgetTrackerProps> = ({ 
   transactions, 
   categories, 
+  customCategories,
   onAddTransaction, 
   onEditTransaction,
   onDeleteTransaction,
   onAddCategory,
+  onEditCategory,
+  onDeleteCategory,
   currencySymbol
 }) => {
   const [amount, setAmount] = useState('');
@@ -29,6 +35,11 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
   
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Category Management State
+  const [isManagingCategories, setIsManagingCategories] = useState(false);
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null);
+  const [editCategoryValue, setEditCategoryValue] = useState('');
 
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,6 +110,28 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
     }
   };
 
+  const startEditCategory = (cat: string) => {
+    setEditingCategoryName(cat);
+    setEditCategoryValue(cat);
+  };
+
+  const handleFinishEditCategory = () => {
+    if (editingCategoryName && editCategoryValue.trim() && editingCategoryName !== editCategoryValue.trim()) {
+      onEditCategory(editingCategoryName, editCategoryValue.trim());
+      if (category === editingCategoryName) setCategory(editCategoryValue.trim());
+      setEditingCategoryName(null);
+    } else {
+      setEditingCategoryName(null);
+    }
+  };
+
+  const handleDeleteCatClick = (cat: string) => {
+    if (window.confirm(`Are you sure you want to delete the "${cat}" category? Existing transactions using this category will be changed to "Other".`)) {
+      onDeleteCategory(cat);
+      if (category === cat) setCategory('Other');
+    }
+  };
+
   const requestDelete = (id: string) => {
     setDeleteConfirmationId(id);
   };
@@ -138,7 +171,7 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
 
   return (
     <div className="space-y-6 pb-20">
-      <div className={`bg-white dark:bg-verse-card p-6 rounded-2xl border ${editingId ? 'border-verse-accent shadow-md shadow-verse-accent/20' : 'border-slate-200 dark:border-slate-700'} shadow-sm dark:shadow-none transition-all`}>
+      <div className={`bg-white dark:bg-verse-card p-6 rounded-2xl border ${editingId ? 'border-verse-accent shadow-md shadow-verse-accent/20' : 'border-slate-200 dark:border-slate-700'} shadow-sm dark:shadow-none transition-all animate-fade-in`}>
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2">
             {editingId ? (
@@ -211,7 +244,19 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Category</label>
+            <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs text-slate-500 dark:text-slate-400">Category</label>
+                {customCategories.length > 0 && !isAddingCategory && (
+                    <button 
+                        type="button" 
+                        onClick={() => setIsManagingCategories(!isManagingCategories)}
+                        className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isManagingCategories ? 'text-verse-accent' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                    >
+                        {isManagingCategories ? 'Done Managing' : 'Manage Custom'}
+                    </button>
+                )}
+            </div>
+            
             {isAddingCategory ? (
               <div className="flex gap-2">
                 <input
@@ -237,6 +282,42 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
                   <Icons.X size={20} />
                 </button>
               </div>
+            ) : isManagingCategories ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 custom-scrollbar">
+                    {customCategories.map(cat => (
+                        <div key={cat} className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-verse-card rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm animate-fade-in">
+                            {editingCategoryName === cat ? (
+                                <input 
+                                    autoFocus
+                                    value={editCategoryValue}
+                                    onChange={(e) => setEditCategoryValue(e.target.value)}
+                                    onBlur={handleFinishEditCategory}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleFinishEditCategory()}
+                                    className="flex-1 bg-slate-100 dark:bg-slate-800 text-xs py-1 px-2 rounded focus:outline-none text-slate-900 dark:text-white"
+                                />
+                            ) : (
+                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{cat}</span>
+                            )}
+                            <div className="flex items-center gap-1">
+                                {editingCategoryName === cat ? (
+                                    <button onClick={handleFinishEditCategory} className="text-emerald-500"><Icons.Check size={14} /></button>
+                                ) : (
+                                    <>
+                                        <button type="button" onClick={() => startEditCategory(cat)} className="text-slate-400 hover:text-verse-accent"><Icons.Edit size={14} /></button>
+                                        <button type="button" onClick={() => handleDeleteCatClick(cat)} className="text-slate-400 hover:text-rose-500"><Icons.Trash size={14} /></button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    <button 
+                        type="button"
+                        onClick={() => { setIsAddingCategory(true); setIsManagingCategories(false); }}
+                        className="w-full py-2 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-400 hover:text-verse-accent hover:border-verse-accent transition-all flex items-center justify-center gap-1"
+                    >
+                        <Icons.Plus size={12} /> Add More
+                    </button>
+                </div>
             ) : (
               <div className="flex gap-2">
                 <select
@@ -271,7 +352,7 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
 
       <div className="space-y-4">
         {/* Filter Toolbar */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2 animate-fade-in">
           <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">Recent History</h3>
           
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -339,7 +420,7 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
               style={{ animationDelay: `${index * 50}ms` }}
               className={`
                 relative p-4 rounded-2xl border flex justify-between items-center group transition-all duration-300 hover:scale-[1.02] hover:shadow-lg
-                animate-slide-up
+                animate-fade-in animate-slide-up
                 ${deletingIds.has(t.id) ? 'opacity-0 -translate-x-4 pointer-events-none' : 'opacity-100'}
                 ${editingId === t.id ? 'ring-2 ring-verse-accent border-transparent scale-[1.02]' : ''}
                 ${t.type === TransactionType.INCOME 

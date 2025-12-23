@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Quest, NewsItem, LessonContent } from '../types';
 import { Icons } from './Icons';
@@ -10,8 +11,11 @@ interface LearningHubProps {
   onNavigate: (tab: 'budget' | 'invest' | 'goals') => void;
 }
 
+const NEWS_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
 const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNavigate }) => {
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [isRefreshingNews, setIsRefreshingNews] = useState(false);
   
   // Lesson & Quiz State
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null); // Quest ID
@@ -24,11 +28,27 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
   const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
-    const fetchNews = async () => {
-      const items = await getExplainedNews();
-      setNews(items);
+    const fetchNews = async (isBackground = false) => {
+      if (isBackground) setIsRefreshingNews(true);
+      try {
+        const items = await getExplainedNews();
+        setNews(items);
+      } catch (err) {
+        console.error("Failed to refresh news:", err);
+      } finally {
+        setIsRefreshingNews(false);
+      }
     };
+
+    // Initial fetch
     fetchNews();
+
+    // Set up periodic refresh
+    const intervalId = setInterval(() => {
+      fetchNews(true);
+    }, NEWS_REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleStartLesson = async (quest: Quest) => {
@@ -154,10 +174,19 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
 
       {/* Trending News */}
       <div>
-        <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <Icons.Zap className="text-yellow-500 dark:text-yellow-400" />
-          Trending Now
-        </h2>
+        <div className="flex justify-between items-center mb-4 px-1">
+          <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Icons.Zap className="text-yellow-500 dark:text-yellow-400" />
+            Trending Now
+          </h2>
+          {isRefreshingNews && (
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-verse-accent animate-pulse uppercase tracking-widest bg-verse-accent/5 px-2 py-1 rounded-full border border-verse-accent/10">
+              <Icons.Refresh size={10} className="animate-spin" />
+              Syncing
+            </div>
+          )}
+        </div>
+        
         <div className="grid gap-4">
           {news.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-slate-500 gap-2">
@@ -166,13 +195,18 @@ const LearningHub: React.FC<LearningHubProps> = ({ quests, onCompleteQuest, onNa
             </div>
           ) : (
             news.map(item => (
-              <div key={item.id} className="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <div key={item.id} className="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group relative overflow-hidden">
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded uppercase tracking-wider">{item.tag}</span>
-                  <span className="text-[10px] text-slate-400">Live</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span className="text-[10px] text-slate-400">Live</span>
+                  </div>
                 </div>
-                <h3 className="font-bold text-slate-900 dark:text-white mb-1">{item.title}</h3>
+                <h3 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-verse-accent transition-colors">{item.title}</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{item.summary}</p>
+                {/* Visual accent for new/updated news */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-verse-accent/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
             ))
           )}

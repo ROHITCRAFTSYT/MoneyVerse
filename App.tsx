@@ -286,6 +286,44 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditCategory = async (oldName: string, newName: string) => {
+    const currentCustoms = user.customCategories || [];
+    const updatedCategories = currentCustoms.map(c => c === oldName ? newName : c);
+    
+    // Update user categories
+    setUser(prev => ({ ...prev, customCategories: updatedCategories }));
+    await db.user.update({ customCategories: updatedCategories });
+
+    // Update existing transactions that used this category
+    const updatedTransactions = transactions.map(t => t.category === oldName ? { ...t, category: newName } : t);
+    setTransactions(updatedTransactions);
+    
+    // Save transactions - this might be slow for many txs, but essential for data integrity
+    for (const t of updatedTransactions) {
+      if (t.category === newName) {
+        await db.transactions.update(t);
+      }
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    const currentCustoms = user.customCategories || [];
+    const updatedCategories = currentCustoms.filter(c => c !== name);
+    
+    setUser(prev => ({ ...prev, customCategories: updatedCategories }));
+    await db.user.update({ customCategories: updatedCategories });
+
+    // Revert existing transactions using this category to 'Other'
+    const updatedTransactions = transactions.map(t => t.category === name ? { ...t, category: 'Other' } : t);
+    setTransactions(updatedTransactions);
+    
+    for (const t of updatedTransactions) {
+      if (t.category === 'Other') {
+        await db.transactions.update(t);
+      }
+    }
+  };
+
   const handleBuyAsset = async (asset: Asset, qty: number) => {
     const cost = asset.price * qty;
     if (user.simulatedCash >= cost) {
@@ -479,10 +517,13 @@ const App: React.FC = () => {
           <BudgetTracker 
             transactions={transactions} 
             categories={[...DEFAULT_CATEGORIES, ...(user.customCategories || [])]}
+            customCategories={user.customCategories || []}
             onAddTransaction={handleAddTransaction}
             onEditTransaction={handleEditTransaction}
             onDeleteTransaction={handleDeleteTransaction}
             onAddCategory={handleAddCategory}
+            onEditCategory={handleEditCategory}
+            onDeleteCategory={handleDeleteCategory}
             currencySymbol={CURRENCY_SYMBOLS[user.currency] || '$'}
           />
         )}

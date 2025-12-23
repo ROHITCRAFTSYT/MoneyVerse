@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, Transaction, TransactionType, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { getFinancialAdvice } from '../services/geminiService';
 
 interface DashboardProps {
@@ -25,10 +25,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
     .filter(t => t.type === TransactionType.EXPENSE)
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
   const currencySymbol = CURRENCY_SYMBOLS[user.currency] || '$';
 
-  // Prepare chart data
+  // Prepare Pie Chart Data (Category Breakdown)
   const expensesByCategory = transactions
     .filter(t => t.type === TransactionType.EXPENSE)
     .reduce((acc, curr) => {
@@ -36,10 +35,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
       return acc;
     }, {} as Record<string, number>);
 
-  const chartData = Object.keys(expensesByCategory).map(key => ({
+  const pieData = Object.keys(expensesByCategory).map(key => ({
     name: key,
     value: expensesByCategory[key]
   }));
+
+  // Prepare Trend Data (Daily Spending)
+  const trendData = (() => {
+    const dailyMap: Record<string, number> = {};
+    const last30Days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (13 - i));
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    // Initialize map with zeros for the last 14 days
+    last30Days.forEach(day => dailyMap[day] = 0);
+
+    // Fill with actual data
+    transactions
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .forEach(t => {
+        const dateKey = new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (dailyMap.hasOwnProperty(dateKey)) {
+          dailyMap[dateKey] += t.amount;
+        }
+      });
+
+    return Object.keys(dailyMap).map(date => ({
+      date,
+      amount: dailyMap[date]
+    }));
+  })();
 
   const fetchAdvice = async () => {
     setLoadingAi(true);
@@ -49,7 +76,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
     setLoadingAi(false);
     setIsNewInsight(true);
     
-    // Clear the "new" indicator after 10 seconds
     setTimeout(() => {
       setIsNewInsight(false);
     }, 10000);
@@ -132,29 +158,86 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
         </div>
       </div>
 
-      {/* Analytics */}
+      {/* Spending Trend Chart */}
       <div className="bg-white dark:bg-verse-card p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none transition-colors">
-        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white mb-4">Monthly Spending</h3>
+        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white mb-4">Spending Trend</h3>
+        <div className="h-48 w-full">
+          {transactions.filter(t => t.type === TransactionType.EXPENSE).length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#64748b' }} 
+                  dy={10}
+                />
+                <YAxis hide />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    fontSize: '12px',
+                    color: '#fff',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                  }}
+                  itemStyle={{ color: '#8b5cf6', fontWeight: 'bold' }}
+                  cursor={{ stroke: '#8b5cf6', strokeWidth: 2 }}
+                  formatter={(value) => [`${currencySymbol}${Number(value).toFixed(2)}`, 'Spent']}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke="#8b5cf6" 
+                  strokeWidth={3} 
+                  fillOpacity={1} 
+                  fill="url(#colorAmount)" 
+                  animationDuration={1500}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500">
+              <Icons.TrendingUp size={48} className="mb-2 opacity-50" />
+              <p>Start logging to see your trend</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Category Breakdown (Pie Chart) */}
+      <div className="bg-white dark:bg-verse-card p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none transition-colors">
+        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white mb-4">Expense Categories</h3>
         <div className="h-64 w-full">
-          {chartData.length > 0 ? (
+          {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={chartData}
+                  data={pieData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
+                  animationBegin={200}
+                  animationDuration={1200}
                 >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                   ))}
                 </Pie>
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--verse-card)', borderColor: '#334155', borderRadius: '8px', color: 'var(--text-color)' }}
-                  itemStyle={{ color: 'var(--text-color)' }}
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
                   formatter={(value) => `${currencySymbol}${value}`}
                 />
               </PieChart>
@@ -169,10 +252,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
         
         {/* Legend */}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {chartData.map((entry, index) => (
+          {pieData.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-              <span>{entry.name}: {currencySymbol}{entry.value}</span>
+              <span className="truncate">{entry.name}: {currencySymbol}{entry.value}</span>
             </div>
           ))}
         </div>
@@ -181,14 +264,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
       {/* Level Progress */}
       <div className="bg-white dark:bg-verse-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-sm dark:shadow-none transition-colors">
         <div>
-          <p className="text-slate-500 dark:text-slate-400 text-xs">Current Level</p>
+          <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-bold tracking-tight">Progression</p>
           <h3 className="text-xl font-bold font-display text-verse-accent dark:text-verse-warning">Lvl {user.level} Saver</h3>
         </div>
         <div className="text-right">
-          <p className="text-slate-500 dark:text-slate-400 text-xs mb-1">{user.xp} / {user.level * 1000} XP</p>
+          <p className="text-slate-500 dark:text-slate-400 text-xs mb-1 font-mono">{user.xp} / {user.level * 1000} XP</p>
           <div className="w-32 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-verse-accent dark:bg-verse-warning transition-all duration-500" 
+              className="h-full bg-verse-accent dark:bg-verse-warning transition-all duration-1000" 
               style={{ width: `${(user.xp / (user.level * 1000)) * 100}%` }}
             ></div>
           </div>
