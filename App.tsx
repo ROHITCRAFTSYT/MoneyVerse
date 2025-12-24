@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Icons } from './components/Icons';
 import Dashboard from './components/Dashboard';
@@ -412,6 +411,12 @@ const App: React.FC = () => {
     completeSpecificQuest('6'); // Goal Setter
   };
 
+  const handleDeleteGoal = async (id: string) => {
+    const updatedGoals = goals.filter(g => g.id !== id);
+    setGoals(updatedGoals);
+    await db.goals.save(updatedGoals);
+  };
+
   const handleAddFundsToGoal = async (goalId: string, amount: number) => {
     let goalCompleted = false;
     const updatedGoals = goals.map(g => {
@@ -540,6 +545,7 @@ const App: React.FC = () => {
             goals={goals}
             currency={user.currency}
             onAddGoal={handleAddGoal}
+            onDeleteGoal={handleDeleteGoal}
             onAddFunds={handleAddFundsToGoal}
           />
         )}

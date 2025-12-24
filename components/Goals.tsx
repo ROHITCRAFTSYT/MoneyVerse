@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Goal, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
@@ -9,10 +7,11 @@ interface GoalsProps {
   goals: Goal[];
   currency: string;
   onAddGoal: (goal: Omit<Goal, 'id' | 'currentAmount' | 'completed'>) => void;
+  onDeleteGoal: (goalId: string) => void;
   onAddFunds: (goalId: string, amount: number) => void;
 }
 
-const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onAddFunds }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onDeleteGoal, onAddFunds }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newTarget, setNewTarget] = useState('');
@@ -20,6 +19,9 @@ const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onAddFunds })
   
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
+
+  // Delete Confirmation State
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const currencySymbol = CURRENCY_SYMBOLS[currency] || '$';
 
@@ -44,6 +46,13 @@ const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onAddFunds })
       onAddFunds(selectedGoalId, parseFloat(depositAmount));
       setSelectedGoalId(null);
       setDepositAmount('');
+    }
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirmId) {
+      onDeleteGoal(deleteConfirmId);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -151,6 +160,37 @@ const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onAddFunds })
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-verse-card w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-2xl animate-scale-in">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                <Icons.Alert size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Delete Goal?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Are you sure you want to delete "{goals.find(g => g.id === deleteConfirmId)?.title}"? Your saved progress data will be lost.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteConfirm}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-900/20 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Goals List */}
       <div className="grid gap-4">
         {goals.length === 0 ? (
@@ -170,7 +210,16 @@ const Goals: React.FC<GoalsProps> = ({ goals, currency, onAddGoal, onAddFunds })
                       {goal.emoji}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-lg">{goal.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-900 dark:text-white text-lg">{goal.title}</h3>
+                        <button 
+                          onClick={() => setDeleteConfirmId(goal.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 transition-opacity"
+                          title="Delete Goal"
+                        >
+                          <Icons.Trash size={14} />
+                        </button>
+                      </div>
                       <p className="text-slate-500 dark:text-slate-400 text-xs">
                         {currencySymbol}{goal.currentAmount.toLocaleString()} / {currencySymbol}{goal.targetAmount.toLocaleString()}
                       </p>
