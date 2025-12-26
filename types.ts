@@ -1,18 +1,27 @@
 
-
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE'
 }
 
-export const DEFAULT_CATEGORIES = [
+export const DEFAULT_EXPENSE_CATEGORIES = [
   'Food',
   'Transport',
   'Entertainment',
   'Shopping',
-  'Savings',
+  'Health',
+  'Education',
+  'Subscriptions',
+  'Other'
+];
+
+export const DEFAULT_INCOME_CATEGORIES = [
   'Allowance',
   'Side Hustle',
+  'Salary',
+  'Cashback',
+  'Gift',
+  'Interest',
   'Other'
 ];
 

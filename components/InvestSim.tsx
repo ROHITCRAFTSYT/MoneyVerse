@@ -67,6 +67,7 @@ const InvestSim: React.FC<InvestSimProps> = ({ user, portfolio, onBuy, onSell })
       setCryptoAssets(mapped);
     } catch (err) {
       console.error(err);
+      setError('Failed to load crypto data. Check connection.');
     }
   };
 
@@ -77,6 +78,7 @@ const InvestSim: React.FC<InvestSimProps> = ({ user, portfolio, onBuy, onSell })
       setStockSources(sources);
     } catch (err) {
       console.error(err);
+      setError('AI search failed to retrieve stock data.');
     }
   };
 
@@ -274,7 +276,11 @@ const InvestSim: React.FC<InvestSimProps> = ({ user, portfolio, onBuy, onSell })
         <div className="flex justify-between items-center px-2">
           <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white flex items-center gap-2">
             {marketType === 'CRYPTO' ? 'Crypto Markets' : 'Trending Stocks'}
-            {marketType === 'STOCKS' && <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">AI SEARCH</span>}
+            {marketType === 'STOCKS' && (
+              <span className="flex items-center gap-1.5 text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">
+                <Icons.AI size={10} className="animate-pulse" /> Gemini AI Search
+              </span>
+            )}
           </h3>
           <button onClick={refreshMarket} className="text-xs flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-verse-accent dark:hover:text-white transition-colors">
             <Icons.Refresh size={12} className={loading ? 'animate-spin' : ''} />
@@ -342,6 +348,31 @@ const InvestSim: React.FC<InvestSimProps> = ({ user, portfolio, onBuy, onSell })
                 <Icons.Target className="mx-auto mb-2 opacity-50" size={32} />
                 <p className="text-sm font-medium">Market data is refreshing...</p>
             </div>
+        )}
+
+        {/* Citations / Grounding Section */}
+        {marketType === 'STOCKS' && stockSources.length > 0 && (
+          <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 animate-fade-in">
+             <h4 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+               <Icons.Check size={12} className="text-emerald-500" /> Information Sources
+             </h4>
+             <ul className="space-y-2">
+                {stockSources.map((source, idx) => (
+                  <li key={idx} className="flex items-center gap-2 overflow-hidden">
+                    <Icons.TrendingUp size={10} className="text-indigo-400 flex-shrink-0" />
+                    <a 
+                      href={source.uri} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline truncate"
+                    >
+                      {source.title || 'Market Reference'}
+                    </a>
+                  </li>
+                ))}
+             </ul>
+             <p className="mt-3 text-[9px] text-slate-400 italic">Data processed by Gemini AI Search using real-time grounding.</p>
+          </div>
         )}
       </div>
 

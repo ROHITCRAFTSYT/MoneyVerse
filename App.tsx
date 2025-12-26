@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Icons } from './components/Icons';
 import Dashboard from './components/Dashboard';
@@ -6,7 +7,7 @@ import InvestSim from './components/InvestSim';
 import LearningHub from './components/LearningHub';
 import Goals from './components/Goals';
 import Profile from './components/Profile';
-import { UserProfile, Transaction, TransactionType, PortfolioItem, Asset, Quest, Goal, Badge, DEFAULT_CATEGORIES, CURRENCY_SYMBOLS } from './types';
+import { UserProfile, Transaction, TransactionType, PortfolioItem, Asset, Quest, Goal, Badge, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES, CURRENCY_SYMBOLS } from './types';
 import { db } from './services/database';
 import { QUEST_TEMPLATES, getInitialQuests } from './data/quests';
 
@@ -275,7 +276,8 @@ const App: React.FC = () => {
 
   const handleAddCategory = async (newCat: string) => {
     const currentCustoms = user.customCategories || [];
-    if (!DEFAULT_CATEGORIES.includes(newCat) && !currentCustoms.includes(newCat)) {
+    const allKnown = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES, ...currentCustoms];
+    if (!allKnown.includes(newCat)) {
       const updatedCategories = [...currentCustoms, newCat];
       setUser(prev => ({ ...prev, customCategories: updatedCategories }));
       await db.user.update({ customCategories: updatedCategories });
@@ -521,7 +523,6 @@ const App: React.FC = () => {
         {activeTab === 'budget' && (
           <BudgetTracker 
             transactions={transactions} 
-            categories={[...DEFAULT_CATEGORIES, ...(user.customCategories || [])]}
             customCategories={user.customCategories || []}
             onAddTransaction={handleAddTransaction}
             onEditTransaction={handleEditTransaction}

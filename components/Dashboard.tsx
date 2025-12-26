@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { UserProfile, Transaction, TransactionType, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -16,41 +17,51 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
   const [loadingAi, setLoadingAi] = useState(false);
   const [isNewInsight, setIsNewInsight] = useState(false);
 
-  // Calculate totals
-  const totalIncome = transactions
-    .filter(t => t.type === TransactionType.INCOME)
-    .reduce((acc, curr) => acc + curr.amount, 0);
-  
-  const totalExpense = transactions
-    .filter(t => t.type === TransactionType.EXPENSE)
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  // Derived Balance Logic - Ensures instantaneous updates when transactions are added
+  const { currentBalance, totalIncome, totalExpense } = useMemo(() => {
+    return transactions.reduce((acc, t) => {
+      const amount = t.amount || 0;
+      if (t.type === TransactionType.INCOME) {
+        acc.totalIncome += amount;
+        acc.currentBalance += amount;
+      } else {
+        acc.totalExpense += amount;
+        acc.currentBalance -= amount;
+      }
+      return acc;
+    }, { currentBalance: 0, totalIncome: 0, totalExpense: 0 });
+  }, [transactions]);
 
   const currencySymbol = CURRENCY_SYMBOLS[user.currency] || '$';
 
   // Prepare Pie Chart Data (Category Breakdown)
-  const expensesByCategory = transactions
-    .filter(t => t.type === TransactionType.EXPENSE)
-    .reduce((acc, curr) => {
-      acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
-      return acc;
-    }, {} as Record<string, number>);
+  const expensesByCategory = useMemo(() => {
+    return transactions
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((acc, curr) => {
+        acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+        return acc;
+      }, {} as Record<string, number>);
+  }, [transactions]);
 
-  const pieData = Object.keys(expensesByCategory).map(key => ({
-    name: key,
-    value: expensesByCategory[key]
-  }));
+  const pieData = useMemo(() => {
+    return Object.keys(expensesByCategory).map(key => ({
+      name: key,
+      value: expensesByCategory[key]
+    }));
+  }, [expensesByCategory]);
 
   // Prepare Trend Data (Daily Spending)
-  const trendData = (() => {
+  const trendData = useMemo(() => {
     const dailyMap: Record<string, number> = {};
-    const last30Days = Array.from({ length: 14 }, (_, i) => {
+    const last14Days = Array.from({ length: 14 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (13 - i));
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
 
-    // Initialize map with zeros for the last 14 days
-    last30Days.forEach(day => dailyMap[day] = 0);
+    // Initialize map with zeros
+    last14Days.forEach(day => dailyMap[day] = 0);
 
     // Fill with actual data
     transactions
@@ -66,7 +77,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
       date,
       amount: dailyMap[date]
     }));
-  })();
+  }, [transactions]);
 
   const fetchAdvice = async () => {
     setLoadingAi(true);
@@ -85,31 +96,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
     <div className="space-y-6 pb-20 animate-fade-in">
       {/* Header Stats */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-verse-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden shadow-sm dark:shadow-none transition-colors">
-          <div className="absolute top-0 right-0 p-2 opacity-10 text-slate-900 dark:text-white">
+        {/* Real Balance Card */}
+        <div className="bg-white dark:bg-verse-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden shadow-sm dark:shadow-none transition-all group">
+          <div className="absolute top-0 right-0 p-2 opacity-10 text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
             <Icons.Wallet size={64} />
           </div>
           <p className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-bold">Real Balance</p>
-          <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white mt-1">
-            {currencySymbol}{user.walletBalance.toLocaleString()}
+          <h2 key={currentBalance} className="text-2xl font-display font-bold text-slate-900 dark:text-white mt-1 animate-scale-in">
+            {currencySymbol}{currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
-          <div className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-            <Icons.Income size={12} />
-            <span>+{currencySymbol}{totalIncome.toLocaleString()} this month</span>
+          <div className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold">
+            <Icons.Income size={12} className="animate-pulse" />
+            <span>+{currencySymbol}{totalIncome.toLocaleString()} earned</span>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-verse-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden shadow-sm dark:shadow-none transition-colors">
-           <div className="absolute top-0 right-0 p-2 opacity-10 text-slate-900 dark:text-white">
+        {/* Sim Portfolio Card */}
+        <div className="bg-white dark:bg-verse-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden shadow-sm dark:shadow-none transition-all group">
+           <div className="absolute top-0 right-0 p-2 opacity-10 text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
             <Icons.Invest size={64} />
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-bold">Sim Portfolio</p>
+          <p className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-bold">Sim Cash</p>
           <h2 className="text-2xl font-display font-bold text-verse-accent mt-1">
             {currencySymbol}{user.simulatedCash.toLocaleString()}
           </h2>
-           <div className="mt-2 text-xs text-blue-500 dark:text-blue-400 flex items-center gap-1">
+           <div className="mt-2 text-xs text-blue-500 dark:text-blue-400 flex items-center gap-1 font-bold">
             <Icons.Zap size={12} />
-            <span>Ready to invest</span>
+            <span>Ready to trade</span>
           </div>
         </div>
       </div>
@@ -160,7 +173,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, transactions }) => {
 
       {/* Spending Trend Chart */}
       <div className="bg-white dark:bg-verse-card p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none transition-colors">
-        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white mb-4">Spending Trend</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">Daily Spending</h3>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Last 14 Days</span>
+        </div>
         <div className="h-48 w-full">
           {transactions.filter(t => t.type === TransactionType.EXPENSE).length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
