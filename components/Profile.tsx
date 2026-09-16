@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { UserProfile, Badge, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
 import { db } from '../services/database';
+import { downloadBackup, downloadTransactionsCSV } from '../services/exportData';
 
 interface ProfileProps {
   user: UserProfile;
@@ -90,6 +91,14 @@ const Profile: React.FC<ProfileProps> = ({ user, badges, onClose, onUpdateUser, 
     const newTheme = user.theme === 'dark' ? 'light' : 'dark';
     onUpdateUser({ theme: newTheme });
     await db.user.update({ theme: newTheme });
+  };
+
+  const handleExportCSV = async () => {
+    const txns = await db.transactions.getAll();
+    const count = downloadTransactionsCSV(txns);
+    if (count === 0) {
+      alert("No transactions to export yet. Log some first!");
+    }
   };
 
   const confirmReset = () => {
@@ -354,7 +363,34 @@ const Profile: React.FC<ProfileProps> = ({ user, badges, onClose, onUpdateUser, 
                 </select>
               </div>
 
-              <button 
+              {/* Export / Backup */}
+              <div className="bg-white dark:bg-verse-card p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-lg text-verse-accent">
+                    <Icons.Download size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">Export Data</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Download your data — it stays on your device</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleExportCSV}
+                    className="flex items-center justify-center gap-2 py-2 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 transition-colors"
+                  >
+                    <Icons.Download size={14} /> Transactions CSV
+                  </button>
+                  <button
+                    onClick={downloadBackup}
+                    className="flex items-center justify-center gap-2 py-2 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 transition-colors"
+                  >
+                    <Icons.Download size={14} /> Full Backup (JSON)
+                  </button>
+                </div>
+              </div>
+
+              <button
                 onClick={confirmReset}
                 className="w-full bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-900/50 p-4 rounded-xl flex items-center justify-between group transition-all"
               >

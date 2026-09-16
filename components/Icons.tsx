@@ -25,6 +25,7 @@ import {
   Moon,
   Camera,
   Upload,
+  Download,
   AlertTriangle
 } from 'lucide-react';
 
@@ -58,5 +59,6 @@ export const Icons = {
   Moon: Moon,
   Camera: Camera,
   Upload: Upload,
+  Download: Download,
   Alert: AlertTriangle
 };
