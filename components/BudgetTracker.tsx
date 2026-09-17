@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../types';
 import { Icons } from './Icons';
+import { downloadTransactionsCSV } from '../services/exportData';
 
 interface BudgetTrackerProps {
   transactions: Transaction[];
@@ -363,8 +364,21 @@ const BudgetTracker: React.FC<BudgetTrackerProps> = ({
       <div className="space-y-4">
         {/* Filter Toolbar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2 animate-fade-in">
-          <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">Recent History</h3>
-          
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">Recent History</h3>
+            <button
+              onClick={() => {
+                if (downloadTransactionsCSV(filteredTransactions) === 0) {
+                  alert("No transactions to export.");
+                }
+              }}
+              title="Export the shown transactions as CSV"
+              className="flex items-center gap-1.5 text-xs font-bold text-verse-accent hover:underline"
+            >
+              <Icons.Download size={14} /> CSV
+            </button>
+          </div>
+
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
              {/* Type Filters */}
              <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex text-xs font-bold">
