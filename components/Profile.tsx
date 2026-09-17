@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { UserProfile, Badge, CURRENCY_SYMBOLS } from '../types';
 import { Icons } from './Icons';
 import { db } from '../services/database';
-import { downloadBackup, downloadTransactionsCSV } from '../services/exportData';
+import { downloadBackup, downloadTransactionsCSV, importBackupFile } from '../services/exportData';
 
 interface ProfileProps {
   user: UserProfile;
@@ -32,6 +32,7 @@ const Profile: React.FC<ProfileProps> = ({ user, badges, onClose, onUpdateUser, 
   const [editAvatar, setEditAvatar] = useState(user.avatar);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
 
   const currencySymbol = CURRENCY_SYMBOLS[user.currency] || '$';
   
@@ -98,6 +99,20 @@ const Profile: React.FC<ProfileProps> = ({ user, badges, onClose, onUpdateUser, 
     const count = downloadTransactionsCSV(txns);
     if (count === 0) {
       alert("No transactions to export yet. Log some first!");
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (!window.confirm("Restore from this backup? It will overwrite your current data.")) return;
+    try {
+      const restored = await importBackupFile(file);
+      alert(`Restored ${restored.length} data set(s). Reloading…`);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not import that file.");
     }
   };
 
@@ -388,6 +403,19 @@ const Profile: React.FC<ProfileProps> = ({ user, badges, onClose, onUpdateUser, 
                     <Icons.Download size={14} /> Full Backup (JSON)
                   </button>
                 </div>
+                <button
+                  onClick={() => backupInputRef.current?.click()}
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-2 px-3 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 transition-colors"
+                >
+                  <Icons.Upload size={14} /> Restore from Backup
+                </button>
+                <input
+                  type="file"
+                  ref={backupInputRef}
+                  onChange={handleImportBackup}
+                  accept="application/json,.json"
+                  className="hidden"
+                />
               </div>
 
               <button

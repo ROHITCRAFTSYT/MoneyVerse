@@ -53,6 +53,37 @@ export function downloadBackup(): void {
   download(JSON.stringify(payload, null, 2), `moneyverse-backup-${today()}.json`, 'application/json');
 }
 
+/**
+ * Restore a backup produced by {@link downloadBackup}. Validates the envelope,
+ * then overwrites the known MoneyVerse keys. Returns the keys restored so the
+ * caller can confirm. Throws on a file that isn't a MoneyVerse backup.
+ */
+export async function importBackupFile(file: File): Promise<string[]> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    throw new Error('That file is not valid JSON.');
+  }
+
+  const envelope = parsed as { app?: unknown; data?: Record<string, unknown> };
+  if (!envelope || envelope.app !== 'MoneyVerse' || typeof envelope.data !== 'object' || envelope.data === null) {
+    throw new Error('That file is not a MoneyVerse backup.');
+  }
+
+  const restored: string[] = [];
+  for (const key of STORAGE_KEYS) {
+    if (key in envelope.data) {
+      localStorage.setItem(key, JSON.stringify(envelope.data[key]));
+      restored.push(key);
+    }
+  }
+  if (restored.length === 0) {
+    throw new Error('This backup contained no MoneyVerse data.');
+  }
+  return restored;
+}
+
 /** Quote a CSV field, escaping embedded quotes, per RFC 4180. */
 function csvField(value: string | number): string {
   const s = String(value ?? '');
