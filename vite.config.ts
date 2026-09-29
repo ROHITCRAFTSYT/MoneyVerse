@@ -10,6 +10,20 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
+      build: {
+        rollupOptions: {
+          output: {
+            // Split heavy, rarely-changing deps into their own chunks so the
+            // main app bundle is smaller and vendor code stays cached across
+            // app updates. (Was a single ~1 MB chunk that tripped Vite's
+            // 500 kB warning.)
+            manualChunks: {
+              charts: ['recharts'],
+              genai: ['@google/genai'],
+            },
+          },
+        },
+      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
